@@ -50,7 +50,7 @@ With `--out`, a `run_meta.json` in the output folder records the model, revision
 pytest
 ```
 
-The 22 tests cover hashing, each quality-screen flag, WER/CER scoring, the output schema, audio decoding (on a generated sine wave), Whisper/CTC detection, the Whisper generation-config repair and the comparison script. They do not download a model and run in a few seconds. There is no CI yet.
+The 26 tests cover hashing, each quality-screen flag, WER/CER scoring and both normalisation levels, the output schema, audio decoding (on a generated sine wave), Whisper/CTC detection, the Whisper generation-config repair and the comparison script. They do not download a model and run in a few seconds. There is no CI yet.
 
 ## Output and provenance schema
 
