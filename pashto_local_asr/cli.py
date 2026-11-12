@@ -1,10 +1,13 @@
 """Command line interface: `pashto-asr transcribe ...` and `pashto-asr evaluate ...`."""
 import argparse
+import os
 import sys
+import time
 from pathlib import Path
 
 from .transcribe import (DEFAULT_LANGUAGE, DEFAULT_MODEL, DEFAULT_REVISION, find_audio,
-                         load_pipeline, output_path_for, transcribe_file, write_json)
+                         load_pipeline, model_card_info, output_path_for,
+                         transcribe_file, update_run_meta, write_json)
 
 
 def build_parser():
@@ -21,6 +24,9 @@ def build_parser():
     t.add_argument("--language", default=DEFAULT_LANGUAGE, help="Language code (default: ps).")
     t.add_argument("--threads", type=int, default=2, help="CPU threads.")
     t.add_argument("--overwrite", action="store_true", help="Replace existing outputs.")
+    t.add_argument("--record-model-card", action="store_true",
+                   help="With --out, also fetch the model's licence and training datasets from the "
+                        "Hugging Face Hub into run_meta.json (a network call; off by default).")
 
     e = sub.add_parser("evaluate", help="Compute WER/CER against a reference TSV.")
     e.add_argument("--reference", type=Path, required=True,
@@ -51,20 +57,34 @@ def main(argv=None):
     if not files:
         print("No audio files found.", file=sys.stderr)
         return 2
+    t_load = time.perf_counter()
     pipe = load_pipeline(args.model, args.revision, args.threads)
+    load_seconds = time.perf_counter() - t_load
     failed = 0
+    card = params = None
+    meta_dir = args.out if args.out else None
     for audio in files:
         target = output_path_for(audio, args.out)
         if target.exists() and not args.overwrite:
             print(f"skip (exists): {target}")
             continue
+        t0 = time.perf_counter()
         try:
             record = transcribe_file(pipe, audio, args.model, args.revision, args.language)
         except Exception as error:  # keep going through a folder
             failed += 1
             print(f"FAILED {audio.name}: {error}", file=sys.stderr)
             continue
+        elapsed = time.perf_counter() - t0
         write_json(target, record)
+        if meta_dir:  # incremental, so a stopped run still has timing
+            if card is None:
+                fetch = args.record_model_card and os.environ.get("HF_HUB_OFFLINE") != "1"
+                card = model_card_info(args.model, args.revision) if fetch else {}
+                params = sum(p.numel() for p in pipe.model.parameters())
+            update_run_meta(meta_dir, args.model, args.revision, pipe.architecture,
+                            args.threads, 1, record["duration_seconds"], elapsed,
+                            load_seconds, params=params, card=card or None)
         flags = record["quality_screen"]["flags"]
         note = "flags: " + ", ".join(flags) if flags else "screen passed"
         print(f"{audio.name} -> {target} [{note}]")

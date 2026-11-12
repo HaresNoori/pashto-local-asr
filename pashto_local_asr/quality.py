@@ -20,7 +20,7 @@ def has_repeated_run(words, run_length=REPEAT_RUN_LENGTH):
     return False
 
 
-def screen(text, segments, duration_seconds):
+def screen(text, segments, duration_seconds, timestamps_expected=True):
     """Return {'passed': bool, 'flags': [...], 'metrics': {...}, 'thresholds': {...}}."""
     flags = []
     text = text or ""
@@ -30,9 +30,11 @@ def screen(text, segments, duration_seconds):
     if not text.strip():
         flags.append("empty_output")
 
-    if not segments or any(
+    # CTC models give no segment timestamps unless word offsets could be derived;
+    # for those the check is not applicable rather than a failure.
+    if timestamps_expected and (not segments or any(
         not seg.get("timestamp") or seg["timestamp"][0] is None for seg in segments
-    ):
+    )):
         flags.append("missing_segment_timestamps")
 
     if has_repeated_run(words):
@@ -44,7 +46,7 @@ def screen(text, segments, duration_seconds):
         if cps < MIN_CHARS_PER_SECOND or cps > MAX_CHARS_PER_SECOND:
             flags.append("implausible_chars_per_second")
 
-    return {
+    result = {
         "passed": not flags,
         "flags": flags,
         "metrics": {
@@ -59,3 +61,6 @@ def screen(text, segments, duration_seconds):
             "min_duration_for_rate_check_seconds": MIN_DURATION_FOR_RATE_CHECK,
         },
     }
+    if not timestamps_expected:
+        result["not_applicable"] = ["missing_segment_timestamps"]
+    return result
