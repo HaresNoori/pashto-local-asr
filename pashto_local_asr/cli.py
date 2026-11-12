@@ -34,6 +34,9 @@ def build_parser():
     e.add_argument("--hyp-dir", type=Path, required=True,
                    help="Folder holding <stem>.transcript.json outputs.")
     e.add_argument("--json-out", type=Path, help="Also write the full report as JSON.")
+    e.add_argument("--normalise", choices=("basic", "pashto"), default="basic",
+                   help="'basic' (default): punctuation and whitespace only. 'pashto': also "
+                        "unify spelling variants such as ي/ی and strip diacritics (see README).")
     return parser
 
 
@@ -41,9 +44,10 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     if args.command == "evaluate":
         from .evaluate import evaluate
-        report = evaluate(args.reference, args.hyp_dir)
+        report = evaluate(args.reference, args.hyp_dir, args.normalise)
         if args.json_out:
             write_json(args.json_out, report)
+        print(f"normalisation: {report['normalisation']}")
         print(f"utterances: {report['utterances']}")
         print(f"missing hypotheses: {len(report['missing_hypotheses'])}")
         print(f"WER: {report['wer']}")

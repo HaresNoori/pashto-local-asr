@@ -60,6 +60,32 @@ def test_normalize_strips_punctuation_and_whitespace():
         "سلام نړی"
 
 
+def test_basic_level_keeps_spelling_variants():
+    assert ev.normalize("ي ی") == "ي ی"
+
+
+def test_pashto_level_unifies_variants_only():
+    # ي -> ی, ك -> ک, ZWNJ and tatweel removed, harakat stripped, digits to ASCII
+    assert ev.normalize("كي", "pashto") == "کی"
+    assert ev.normalize("م‌ـن", "pashto") == "من"
+    assert ev.normalize("بَلّ", "pashto") == "بل"
+    assert ev.normalize("۱۲ ١", "pashto") == "12 1"
+    # distinct Pashto letters survive: ې, ۍ, ئ (precomposed, not decomposed), ګ, ښ
+    kept = "ې ۍ ئ ګ ښ آ"
+    assert ev.normalize(kept, "pashto") == kept
+
+
+def test_pashto_level_changes_scores_only_when_asked():
+    ref, hyp = "زمونږ کورني", "زمونږ کورنی"
+    assert ev.wer(ref, hyp) == 0.5
+    assert ev.wer(ref, hyp, "pashto") == 0.0
+
+
+def test_unknown_level_rejected():
+    with pytest.raises(ValueError):
+        ev.normalize("x", "aggressive")
+
+
 def test_evaluate_against_tsv(tmp_path):
     ref = tmp_path / "ref.tsv"
     ref.write_text("path\tsentence\nclip1.mp3\ta b c d\nclip2.mp3\te f\n", encoding="utf-8")

@@ -90,7 +90,7 @@ Passing the screen means no check fired. It does not mean the transcript is corr
 pashto-asr evaluate --reference test.tsv --hyp-dir drafts/ --json-out report.json
 ```
 
-The reference is a TSV with `path` and `sentence` columns (the Common Voice layout). Each row's file stem is matched to `<stem>.transcript.json` in `--hyp-dir`; missing outputs count as empty. Text is NFC-normalised, punctuation is stripped, and corpus-level WER and CER are reported (total edit distance over total reference length).
+The reference is a TSV with `path` and `sentence` columns (the Common Voice layout). Each row's file stem is matched to `<stem>.transcript.json` in `--hyp-dir`; missing outputs count as empty. Text is NFC-normalised, punctuation is stripped, and corpus-level WER and CER are reported (total edit distance over total reference length). Add `--normalise pashto` to also unify common spelling variants (see the comparison below).
 
 ## Benchmark: Common Voice Spontaneous Speech, Pashto (12 Nov 2026)
 
@@ -149,6 +149,17 @@ What this shows:
 - **The quality screen only helps on the default model.** CTC models give no segment timestamps, so the timestamp check does not apply and all 133 CTC drafts passed. For the Nasimbahar Whisper model, passed drafts (66.2% WER) were no better than flagged ones (63.8%). Making the screen useful beyond one model is [issue #2](https://github.com/HaresNoori/pashto-local-asr/issues/2).
 - **Possible training-data overlap.** The Nasimbahar model's card lists Common Voice 17 Pashto. That is the read-speech corpus, not Spontaneous Speech, but the two projects may share contributors, so overlap cannot be ruled out. The default model's card lists no datasets. The two other ihanif models list FLEURS only.
 
+**Spelling variants.** Pashto is written inconsistently, and the references themselves mix the Arabic and Persian forms of ye (ي about 1,600 times, ی about 2,000). `--normalise pashto` unifies those and a few rarer variants (ك/ک, ة/ه, joiners, diacritics, digits) before scoring, while keeping letters that are distinct in Pashto (ې, ۍ, ئ, ګ) apart. The headline figures above use the basic level.
+
+| Model | WER basic | WER `pashto` | CER basic | CER `pashto` |
+|---|---|---|---|---|
+| w2v-BERT 2 | 49.2% | 47.6% | 31.1% | 30.5% |
+| Nasimbahar whisper-medium | 64.8% | 60.7% | 53.4% | 52.2% |
+| default | 70.2% | 69.7% | 58.2% | 57.8% |
+| wav2vec2-xls-r-300m | 74.9% | 74.1% | 43.3% | 42.7% |
+
+The gain is small (0.5 to 4 points). Spelling inconsistency is not the main source of error; most errors are real recognition errors. The Nasimbahar model gains most because it never writes ي.
+
 Not in the table: `ihanif/whisper-small-pashto` and `ihanif/whisper-medium-pashto` were stopped at a 60-minute limit after 35 and 6 clips. The few drafts they produced were mostly wrong (whisper-medium's six drafts scored over 190% WER, the pattern of a decoding loop), but too few clips finished to score them fairly.
 
 Speed figures are rough. Some runs were limited to 2 CPU cores partway through, so wall times are not comparable between models and are not tabulated.
@@ -173,8 +184,9 @@ python scripts/compare_models.py --reference bench/test_reference.tsv runs/model
 
 1. ~~Publish a Common Voice Pashto benchmark~~ (done, spontaneous speech, above). Next: the read-speech test split.
 2. ~~Compare other open Pashto models~~ (done, above). Next: decide whether w2v-BERT 2 should become the default.
-3. Dari support: model selection, a benchmark, and a language-specific screen.
-4. Optional reviewer workflow for correcting drafts, ordered by quality-screen result.
+3. Larger gains need a Pashto language model in CTC decoding, then fine-tuning on more conversational Pashto. Fine-tuning needs GPU time and is not funded yet.
+4. Dari support: model selection, a benchmark, and a language-specific screen.
+5. Optional reviewer workflow for correcting drafts, ordered by quality-screen result.
 
 ## Credits and licences
 

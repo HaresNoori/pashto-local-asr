@@ -10,8 +10,33 @@ from pathlib import Path
 _PUNCT = re.compile("[" + re.escape(string.punctuation + "،؛؟۔") + "]")
 
 
-def normalize(text):
+LEVELS = ("basic", "pashto")
+
+# "pashto" level: orthographic variants that writers (and the Common Voice references)
+# use interchangeably. Letters that are distinct in Pashto (ې, ۍ, ئ, ګ, ښ, ...) are kept.
+_PASHTO_MAP = str.maketrans({
+    "ي": "ی",  # ي Arabic yeh -> ی  (the references mix both; see README)
+    "ى": "ی",  # ى alef maksura -> ی
+    "ك": "ک",  # ك Arabic kaf -> ک
+    "ة": "ه",  # ة teh marbuta -> ه
+    "ہ": "ه",  # ہ heh goal -> ه
+    "‌": None, "‍": None, "ـ": None,  # ZWNJ, ZWJ, tatweel
+    **{chr(0x0660 + d): str(d) for d in range(10)},  # Arabic-Indic digits
+    **{chr(0x06F0 + d): str(d) for d in range(10)},  # Extended Arabic-Indic digits
+})
+
+
+def normalize(text, level="basic"):
+    """'basic': NFC, punctuation stripped, whitespace collapsed (the headline scoring).
+    'pashto': also removes diacritics and joiners and unifies the variants in _PASHTO_MAP."""
+    if level not in LEVELS:
+        raise ValueError(f"unknown normalisation level {level!r}; choose from {LEVELS}")
     text = unicodedata.normalize("NFC", text or "")
+    if level == "pashto":
+        # Strip standalone diacritics (harakat) on the NFC text, not after NFD, so that
+        # precomposed letters such as ئ and آ keep their marks.
+        text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+        text = text.translate(_PASHTO_MAP)
     text = _PUNCT.sub(" ", text)
     return " ".join(text.split())
 
@@ -28,27 +53,27 @@ def edit_distance(ref, hyp):
     return previous[-1]
 
 
-def wer_counts(reference, hypothesis):
-    ref = normalize(reference).split()
-    return edit_distance(ref, normalize(hypothesis).split()), len(ref)
+def wer_counts(reference, hypothesis, level="basic"):
+    ref = normalize(reference, level).split()
+    return edit_distance(ref, normalize(hypothesis, level).split()), len(ref)
 
 
-def cer_counts(reference, hypothesis):
-    ref = normalize(reference)
-    return edit_distance(ref, normalize(hypothesis)), len(ref)
+def cer_counts(reference, hypothesis, level="basic"):
+    ref = normalize(reference, level)
+    return edit_distance(ref, normalize(hypothesis, level)), len(ref)
 
 
-def wer(reference, hypothesis):
-    errors, n = wer_counts(reference, hypothesis)
-    return errors / n if n else (0.0 if not normalize(hypothesis) else 1.0)
+def wer(reference, hypothesis, level="basic"):
+    errors, n = wer_counts(reference, hypothesis, level)
+    return errors / n if n else (0.0 if not normalize(hypothesis, level) else 1.0)
 
 
-def cer(reference, hypothesis):
-    errors, n = cer_counts(reference, hypothesis)
-    return errors / n if n else (0.0 if not normalize(hypothesis) else 1.0)
+def cer(reference, hypothesis, level="basic"):
+    errors, n = cer_counts(reference, hypothesis, level)
+    return errors / n if n else (0.0 if not normalize(hypothesis, level) else 1.0)
 
 
-def evaluate(reference_tsv, hyp_dir):
+def evaluate(reference_tsv, hyp_dir, level="basic"):
     """Corpus-level WER/CER. Each reference row's `path` stem is matched to
     `<stem>.transcript.json` in hyp_dir. Missing hypotheses count as empty output."""
     hyp_dir = Path(hyp_dir)
@@ -63,12 +88,13 @@ def evaluate(reference_tsv, hyp_dir):
             else:
                 hypothesis = ""
                 missing.append(stem)
-            we, wn = wer_counts(row["sentence"], hypothesis)
-            ce, cn = cer_counts(row["sentence"], hypothesis)
+            we, wn = wer_counts(row["sentence"], hypothesis, level)
+            ce, cn = cer_counts(row["sentence"], hypothesis, level)
             w_err, w_n, c_err, c_n = w_err + we, w_n + wn, c_err + ce, c_n + cn
             rows.append({"path": row["path"], "wer": we / wn if wn else None,
                          "cer": ce / cn if cn else None})
     return {
+        "normalisation": level,
         "utterances": len(rows),
         "missing_hypotheses": missing,
         "wer": w_err / w_n if w_n else None,

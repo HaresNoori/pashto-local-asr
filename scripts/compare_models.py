@@ -17,7 +17,7 @@ from pathlib import Path
 from pashto_local_asr.evaluate import cer_counts, wer_counts
 
 
-def summarise(reference_tsv, run_dir, only_stems=None):
+def summarise(reference_tsv, run_dir, only_stems=None, level="basic"):
     """Per-run statistics dict. Pure file reading, no model needed."""
     run_dir = Path(run_dir)
     meta_file = run_dir / "run_meta.json"
@@ -38,8 +38,8 @@ def summarise(reference_tsv, run_dir, only_stems=None):
                 model, revision = model or record.get("model"), revision or record.get("revision")
             else:
                 text, passed, missing = "", False, missing + 1
-            we, wn = wer_counts(row["sentence"], text)
-            ce, cn = cer_counts(row["sentence"], text)
+            we, wn = wer_counts(row["sentence"], text, level)
+            ce, cn = cer_counts(row["sentence"], text, level)
             for key in ("all", "passed") if passed else ("all",):
                 t = tot[key]
                 t[0] += we; t[1] += wn; t[2] += ce; t[3] += cn; t[4] += 1
@@ -105,9 +105,12 @@ def main(argv=None):
     parser.add_argument("runs", nargs="+", type=Path, help="Run folders of drafts.")
     parser.add_argument("--common-only", action="store_true",
                         help="Score only clips every run has a draft for.")
+    parser.add_argument("--normalise", choices=("basic", "pashto"), default="basic",
+                        help="Text normalisation before scoring (see pashto-asr evaluate).")
     args = parser.parse_args(argv)
     only = common_stems(args.runs) if args.common_only else None
-    rows = [summarise(args.reference, run, only) for run in args.runs]
+    rows = [summarise(args.reference, run, only, args.normalise) for run in args.runs]
+    print(f"Normalisation: {args.normalise}\n")
     if only is not None:
         print(f"Scored on the {len(only)} clips common to all runs.\n")
     print(render_table(rows))
