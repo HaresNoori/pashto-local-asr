@@ -4,7 +4,7 @@ Offline speech-to-text drafts for Pashto, with provenance on every output and a 
 
 ## The problem
 
-Pashto (roughly 40-60 million speakers) and Dari are under-served by speech technology: few open benchmarks, few maintained models, and weak support in mainstream tools. The usual workaround is a cloud transcription service, which means uploading recordings that may contain sensitive testimony, legal material or identifying details to a third party.
+Pashto and Dari have few open speech benchmarks, few maintained models, and weak support in mainstream tools. The usual workaround is a cloud transcription service, which means uploading recordings that may contain sensitive testimony, legal material or identifying details to a third party.
 
 `pashto-local-asr` is a small, auditable alternative. It runs a pinned open model on your own CPU, records exactly which audio and which model produced each transcript, and flags the obvious failure modes instead of presenting every output as trustworthy.
 
@@ -41,6 +41,14 @@ pashto-asr transcribe interview.m4a --model ORG/MODEL --revision COMMIT_HASH
 ```
 
 Existing outputs are skipped unless you pass `--overwrite`. `python -m pashto_local_asr ...` also works.
+
+## Tests
+
+```bash
+pytest
+```
+
+The 12 tests cover hashing, each quality-screen flag, WER/CER scoring, the output schema and audio decoding (on a generated sine wave). They do not download a model and run in under a second. There is no CI yet.
 
 ## Output and provenance schema
 

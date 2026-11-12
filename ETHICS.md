@@ -17,7 +17,7 @@ This tool exists because people working with Pashto and Dari audio often handle 
 - Do not use it to build watch-lists or to support targeting of individuals or communities.
 
 ## Outputs are drafts
-- Every output is marked `unverified_draft`. Machine transcripts of Pashto and Dari contain errors, and the default model has not been validated on conversational speech.
+- Every output is marked `unverified_draft`. Machine transcripts of Pashto and Dari contain errors, and on spontaneous Pashto the default model gets about 70% of words wrong (see the benchmark in the README).
 - A passed quality screen is not evidence of accuracy. Have a fluent speaker review any transcript before it is quoted, published, relied on in a legal or humanitarian setting, or used to make a decision about a person.
 - Keep the recorded SHA-256 with any transcript so it can always be traced to the exact audio and model that produced it.
 
